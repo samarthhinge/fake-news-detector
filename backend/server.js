@@ -11,62 +11,80 @@ const authRoutes = require('./src/routes/auth');
 const analyzeRoutes = require('./src/routes/analyze');
 const historyRoutes = require('./src/routes/history');
 const reportRoutes = require('./src/routes/report');
-const newsRoutes = require('./src/routes/news'); // ✅ ADDED
+const newsRoutes = require('./src/routes/news');
 
 // Import middleware
 const errorHandler = require('./src/middleware/errorHandler');
 
 const app = express();
 
+
 // ============ MIDDLEWARE ============
 
-// Security middleware
+// Security
 app.use(helmet());
 
-// CORS configuration
+// ✅ FIXED CORS (MOST IMPORTANT)
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: [
+    "http://localhost:3000",
+    "https://fake-news-detector-gamma-two.vercel.app",
+    "https://fake-news-detector-git-main-samarthhinges-projects.vercel.app"
+  ],
   credentials: true
 }));
 
-// Body parser middleware
+// Body parser
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Optional: request logger (helps debugging)
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
+
 
 // ============ DATABASE CONNECTION ============
 
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✓ MongoDB connected successfully'))
   .catch(err => {
-    console.error('✗ MongoDB connection failed:', err);
-    process.exit(1);
+    console.error('✗ MongoDB connection failed:', err.message);
+    // ❌ don't crash server in production
   });
+
 
 // ============ ROUTES ============
 
-// Root route (IMPORTANT for Render)
+// Root route (Render check)
 app.get('/', (req, res) => {
   res.send('Backend is running 🚀');
 });
 
+// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/analyze', analyzeRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/report', reportRoutes);
-app.use('/api/news', newsRoutes); // ✅ CORRECT PLACE
+app.use('/api/news', newsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
-// 404 handler (MUST BE LAST ROUTE)
+
+// ============ ERROR HANDLING ============
+
+// 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// Error handler
+// Global error handler
 app.use(errorHandler);
+
 
 // ============ START SERVER ============
 
@@ -77,8 +95,13 @@ app.listen(PORT, () => {
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-// Handle unhandled rejections
+
+// ============ SAFETY HANDLERS ============
+
 process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Rejection:', err);
-  process.exit(1);
+  console.error('Unhandled Rejection:', err.message);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err.message);
 });
